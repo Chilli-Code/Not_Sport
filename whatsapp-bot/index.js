@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { Client: NotionClient } = require('@notionhq/client');
+const qrcode = require('qrcode-terminal');
 
 const app = express();
 
@@ -22,10 +23,27 @@ const whatsappClient = new Client({
 const notion = new NotionClient({ auth: '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' });
 const databaseId = '142711b9c557800a8b97d33046ae825d';
 
+// Evento para mostrar el QR
+whatsappClient.on('qr', (qr) => {
+  console.log('Escanea este código QR para iniciar sesión con WhatsApp:');
+  qrcode.generate(qr, { small: true });
+});
+
+// Evento cuando la sesión está lista
+whatsappClient.on('ready', () => {
+  console.log('WhatsApp client is ready!');
+});
+
+// Evento para capturar errores de autenticación
+whatsappClient.on('auth_failure', (msg) => {
+  console.error('Error de autenticación', msg);
+});
+
 // Almacenar estados previos, recordatorios activos y usuarios en espera de correo electrónico
 let previousStates = {};
 let activeReminders = {};
-let awaitingEmail = {}; // Usuarios esperando correo electrónico
+let awaitingEmail = {};
+let usersAwaitingResponse = {};
 
 // Verificar cambios en los estados de los pedidos
 const checkForUpdates = async () => {
@@ -42,19 +60,16 @@ const checkForUpdates = async () => {
       const cancha = page.properties['Cancha']?.select?.name || 'Cancha desconocida';
       const horaPartido = page.properties['Hora Del Partido']?.rich_text?.[0]?.text?.content || 'Hora no especificada';
 
-      // Detectar cambios en el estado
       if (previousStates[pageId] !== estado && estado === 'Listo') {
         console.log(`Pedido ${pageId} está ahora "Listo". Enviando notificación...`);
 
         if (telefono) {
-          // Enviar mensaje inicial
           await whatsappClient.sendMessage(
             `${telefono}@c.us`,
             `🎉 ¡Tu partido en la cancha ${cancha} está listo para las ${horaPartido}! Escribe *Ok* para proceder con el pago. ⚽`
           );
           console.log(`Mensaje enviado a ${telefono}`);
 
-          // Iniciar recordatorio
           if (!activeReminders[pageId]) {
             activeReminders[pageId] = setInterval(async () => {
               console.log(`Recordatorio para pedido ${pageId}`);
@@ -62,12 +77,10 @@ const checkForUpdates = async () => {
                 `${telefono}@c.us`,
                 `⏰ Recordatorio: ¡Tu partido en la cancha ${cancha} está listo! Responde con *Ok* para proceder con el pago.`
               );
-            }, 3600000); // 1 hora en milisegundos
+            }, 3600000); // 1 hora
           }
         }
       }
-
-      // Actualizar el estado previo
       previousStates[pageId] = estado;
     }
   } catch (error) {
@@ -75,7 +88,6 @@ const checkForUpdates = async () => {
   }
 };
 
-// Revisar los estados cada minuto
 setInterval(checkForUpdates, 60000);
 
 // Manejar mensajes entrantes
@@ -84,10 +96,142 @@ whatsappClient.on('message', async (message) => {
 
   const telefono = message.from.replace('@c.us', '');
   const userMessage = message.body.trim().toLowerCase();
+  
+  if (usersAwaitingResponse[telefono]) {
+    if (usersAwaitingResponse[telefono] === 'menu') {
+        // Lógica para manejar selección del menú principal
+        switch (userMessage.trim()) {
+            case '1':
+            case '2':
+            case '3':
+                await whatsappClient.sendMessage(
+                    message.from,
+                    `Has seleccionado la opción ${userMessage}. Por favor, espera mientras procesamos tu solicitud.`
+                );
+                console.log(`Opción ${userMessage} seleccionada por el usuario.`);
+                break;
+            case '4': // Manejar la opción de precios
+                await whatsappClient.sendMessage(
+                    message.from,
+                    `✅ *Descargar Partido*🏟️: _20.000💵_ \n` +
+                    `✅ *Resumen Del Partido*: _12.000💵_ \n\n` +
+                    `✅ *Clips Personalizados*: \n\n` +
+                    `⚫ _Clip Corto:_ *5.000💵* Para aquellos momentos breves y destacados, ideal para jugadas individuales o goles.\n\n` +
+                    `⚫ _Clip Largo:_ *10.000💵* Para secuencias más detalladas o análisis completos.`
+                );
+                console.log('Menú de precios enviado.');
+                break;
+            default:
+                await whatsappClient.sendMessage(
+                    message.from,
+                    `⚠️ Opción no válida. Por favor, selecciona un número del menú.`
+                );
+                console.log('Opción no válida seleccionada.');
+                return;
+        }
+        delete usersAwaitingResponse[telefono]; // Eliminar el estado después de procesar la selección
+        return;
+    }
 
-  // Verificar si el usuario está en espera de correo
+    // Lógica para manejar respuesta de "¿Desea continuar?"
+    if (userMessage === 'sí' || userMessage === 'si') {
+        await whatsappClient.sendMessage(
+            message.from,
+            `*Menú principal*\n
+            1️⃣ *Compra De Partido 📽️*.\n
+            2️⃣ *Compra de Resumen y Clip 🎬*.\n
+            3️⃣ *Combo Completo 📦*.\n 
+            4️⃣ *Precios 💸* \n\n
+            Por favor ingresa el número de la opción que deseas seleccionar.`
+        );
+        usersAwaitingResponse[telefono] = 'menu'; // Cambiar el estado a "menu"
+    } else {
+        await whatsappClient.sendMessage(message.from, 'Gracias por tu tiempo. ¡Hasta luego!');
+        delete usersAwaitingResponse[telefono]; // Eliminar al usuario de la lista de espera si no desea continuar
+    }
+    return;
+}
+
+
+
+// Lógica para manejar selección de opciones en el menú principal
+if (usersAwaitingResponse[telefono] === 'menu') {
+  switch (userMessage.trim()) {
+      case '1':
+      case '2':
+      case '3':
+          await whatsappClient.sendMessage(
+              message.from,
+              `Has seleccionado la opción ${userMessage}. Por favor, espera mientras procesamos tu solicitud.`
+          );
+          console.log(`Opción ${userMessage} seleccionada por el usuario.`);
+          break;
+      case '4': // Manejar la opción de precios
+          await whatsappClient.sendMessage(
+              message.from,
+              `✅ *Descargar Partido*🏟️: _20.000💵_ \n` +
+              `✅ *Resumen Del Partido*: _12.000💵_ \n\n` +
+              `✅ *Clips Personalizados*: \n\n` +
+              `⚫ _Clip Corto:_ *5.000💵* Para aquellos momentos breves y destacados, ideal para jugadas individuales o goles.\n\n` +
+              `⚫ _Clip Largo:_ *10.000💵* Para secuencias más detalladas o análisis completos.`
+          );
+          console.log('Menú de precios enviado.');
+          break;
+      default:
+          await whatsappClient.sendMessage(
+              message.from,
+              `⚠️ Opción no válida. Por favor, selecciona un número del menú.`
+          );
+          console.log('Opción no válida seleccionada.');
+          return;
+  }
+  delete usersAwaitingResponse[telefono]; // Eliminar al usuario de la lista de espera después de procesar su selección
+  return;
+}
+
+  
+  if (userMessage && userMessage !== 'ok' && !awaitingEmail[telefono]) {
+    try {
+      const response = await notion.databases.query({
+          database_id: databaseId,
+          filter: {
+              property: 'Número de Teléfono',
+              phone_number: {
+                  equals: telefono,
+              },
+          },
+      });
+
+        const usuarioRegistrado = response.results.length > 0;
+
+        if (usuarioRegistrado) {
+          // Usuario registrado: Enviar mensaje de bienvenida
+          const usuarioNombre = response.results[0].properties['Usuario']?.title?.[0]?.text?.content || 'Usuario';
+          await whatsappClient.sendMessage(
+              message.from,
+              `Bienvenido usuario: ${usuarioNombre}`
+          );
+          console.log(`Mensaje de bienvenida enviado a ${telefono} con el nombre de usuario: ${usuarioNombre}`);
+      } else {
+          // Validar si el mensaje viene de la web
+          if (!userMessage.startsWith("web:")) { // Cambia esta lógica según cómo identifiques los mensajes de la web
+              await whatsappClient.sendMessage(
+                  message.from,
+                  'Buenas tardes, queremos informarles que no somos Baloa. ¿Desea continuar? Responda con "Sí" o "No".'
+              );
+              usersAwaitingResponse[telefono] = true; // Agregar usuario a la lista de espera
+              console.log(`Mensaje de "no somos Baloa" enviado a ${telefono}.`);
+          } else {
+              console.log('Mensaje recibido desde la web, ignorando lógica de "no somos Baloa".');
+          }
+      }
+  } catch (error) {
+      console.error('Error al verificar usuario en Notion:', error);
+  }
+}
+
   if (awaitingEmail[telefono]) {
-    awaitingEmail[telefono] = false; // Salir del estado de espera
+    awaitingEmail[telefono] = false;
     await whatsappClient.sendMessage(
       message.from,
       `✅ Gracias por compartir tu correo electrónico. Te enviaremos el enlace de tu partido pronto. 📧`
@@ -96,7 +240,6 @@ whatsappClient.on('message', async (message) => {
     return;
   }
 
-  // Manejar respuesta "Ok" para generar pago
   if (userMessage === 'ok') {
     for (const [pageId, reminder] of Object.entries(activeReminders)) {
       const response = await notion.pages.retrieve({ page_id: pageId });
@@ -105,33 +248,22 @@ whatsappClient.on('message', async (message) => {
       if (userPhone === telefono) {
         console.log(`Respuesta "Ok" recibida del usuario ${telefono} para el pedido ${pageId}.`);
 
-        // Detener recordatorio
         clearInterval(reminder);
         delete activeReminders[pageId];
 
-        // Enviar mensaje de generación de pago
-        const paymentLink = 'https://checkout.bold.co/payment/LNK_PJUJJLEW6Q'; // Enlace ficticio
+        const paymentLink = 'https://checkout.bold.co/payment/LNK_PJUJJLEW6Q';
         await whatsappClient.sendMessage(
           message.from,
           `🔗 ¡Gracias! Aquí está el enlace para realizar el pago:
-${paymentLink}
-Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
-
-💸 Tenga dinero disponible.
-✅ No esté bloqueado ni restringido.
-🛍️ Esté habilitado para compras internacionales si tu tarjeta no es Colombiana.
-👌 Tenga topes que le permitan pagar el valor de tu compra.
-          `
+${paymentLink}`
         );
 
-        // Solicitar correo electrónico
         awaitingEmail[telefono] = true;
         await whatsappClient.sendMessage(
           message.from,
           `📧 ¿Nos puedes compartir tu correo electrónico para enviarte el enlace de tu partido?`
         );
 
-        // Actualizar el estado en Notion
         await notion.pages.update({
           page_id: pageId,
           properties: {
@@ -147,7 +279,6 @@ Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
     }
   }
 
-  // Verificar si es un pedido nuevo
   const usernameMatch = message.body.match(/soy \*(.+?)\*/i);
   const canchaMatch = message.body.match(/cancha\s*:?\s*(.+?)(?:\n|$)/i);
   const fechaPartidoMatch = message.body.match(/\*fecha del partido\*:\s*(\d{2}-\d{2}-\d{4})/i);
@@ -162,7 +293,6 @@ Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
   const descripcion = descripcionMatch?.[1]?.trim() || 'No especificada';
   const usuario = usernameMatch?.[1]?.trim() || 'Usuario desconocido';
 
-  // Convertir la fecha del partido al formato ISO 8601
   let fechaPartido = null;
   if (fechaPartidoOriginal) {
     const [day, month, year] = fechaPartidoOriginal.split('-');
@@ -170,11 +300,9 @@ Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
   }
 
   if (!fechaPartido || horaPartido === 'Desconocida') {
-    await whatsappClient.sendMessage(
-      message.from,
-      `⚠ Error: No se pudo registrar tu pedido porque la fecha o la hora del partido son inválidas. Verifica e inténtalo de nuevo.`
+    console.log(
+      `Advertencia: No se puede registrar el pedido. Fecha: ${fechaPartidoOriginal}, Hora: ${horaPartido}`
     );
-    console.error('Error: Fecha u hora del partido inválida.');
     return;
   }
 
@@ -183,63 +311,31 @@ Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
     await notion.pages.create({
       parent: { database_id: databaseId },
       properties: {
-        Usuario: {
-          title: [{ text: { content: usuario } }],
-        },
-        'Fecha Pedido': {
-          date: { start: new Date().toISOString() },
-        },
-        'Fecha del partido': {
-          date: { start: fechaPartido },
-        },
-        'Hora Del Partido': {
-          rich_text: [{ text: { content: horaPartido } }],
-        },
-        'Estado Pedido': {
-          select: { name: 'Pendiente' },
-        },
-        Cancha: {
-          select: { name: cancha },
-        },
-        Equipos: {
-          rich_text: [{ text: { content: equipos } }],
-        },
-        Descripcion: {
-          rich_text: [{ text: { content: descripcion } }],
-        },
-        'Número de Teléfono': {
-          phone_number: telefono,
-        },
+        Usuario: { title: [{ text: { content: usuario } }] },
+        'Fecha Pedido': { date: { start: new Date().toISOString() } },
+        'Fecha del partido': { date: { start: fechaPartido } },
+        'Hora Del Partido': { rich_text: [{ text: { content: horaPartido } }] },
+        'Estado Pedido': { select: { name: 'Pendiente' } },
+        Cancha: { select: { name: cancha } },
+        Equipos: { rich_text: [{ text: { content: equipos } }] },
+        Descripcion: { rich_text: [{ text: { content: descripcion } }] },
+        'Número de Teléfono': { phone_number: telefono },
       },
     });
 
     console.log('Pedido guardado en Notion correctamente.');
-
-    // Enviar mensaje al usuario
     await whatsappClient.sendMessage(
       message.from,
-      `${usuario}, tu partido en la cancha ${cancha} está en cola para las ${horaPartido}. Recibirás una notificación cuando esté listo. ⚽`
+      `${usuario}, tu partido en la cancha ${cancha} está en cola para las ${horaPartido}.`
     );
-    console.log('Mensaje de "en cola" enviado al usuario.');
   } catch (error) {
     console.error('Error al guardar en Notion o enviar mensaje:', error);
-    await whatsappClient.sendMessage(
-        message.from,
-        `⚠ Error: No se pudo registrar tu pedido debido a un problema técnico. Por favor, inténtalo de nuevo más tarde.`
-      );
-      console.error('Error al registrar el pedido:', error);
-    }
-  });
-  
-  whatsappClient.initialize();
-  
-  whatsappClient.on('ready', () => {
-    console.log('WhatsApp client is ready!');
-  });
-  
-  // Servidor Express
-  const PORT = 5000;
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
-  
+  }
+});
+
+whatsappClient.initialize();
+
+const PORT = 5000;
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});

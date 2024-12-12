@@ -77,7 +77,7 @@ const Home = () => {
     📝 *Descripción*: ${formData.descripcion || "No especificada"}
     `.trim();
     const encodedMessage = encodeURIComponent(message);
-    const phoneNumber = "+573146318832";
+    const phoneNumber = "+573005030249";
     const whatsappURL = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
     window.open(whatsappURL, "_blank");
