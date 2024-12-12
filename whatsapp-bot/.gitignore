@@ -1,9 +1,17 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+
+# Ignorar carpetas de autenticación y caché de WhatsApp Web JS
 /.wwebjs_auth/
 /.wwebjs_cache/
+
+# O de forma global (para cualquier subcarpeta)
+**/.wwebjs_auth/
+**/.wwebjs_cache/
+
+
+/node_modules
 /.pnp
 .pnp.*
 .yarn/*
