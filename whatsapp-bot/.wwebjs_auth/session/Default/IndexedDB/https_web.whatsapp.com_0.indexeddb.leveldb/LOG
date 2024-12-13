@@ -1,17 +1,19 @@
-2024/12/12-14:43:11.139 47dc Reusing MANIFEST E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2024/12/12-14:43:11.139 47dc Recovering log #254
-2024/12/12-14:43:11.152 47dc Reusing old log E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000254.log 
-2024/12/12-14:43:12.709 4fac Level-0 table #261: started
-2024/12/12-14:43:12.801 4fac Level-0 table #261: 119862 bytes OK
-2024/12/12-14:43:12.852 4fac Delete type=0 #254
-2024/12/12-14:43:12.852 4fac Manual compaction at level-0 from '\x00J\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00K\x00\x00\x00' @ 0 : 0; will stop at (end)
-2024/12/12-14:43:13.267 4fac Compacting 1@1 + 3@2 files
-2024/12/12-14:43:13.561 4fac Generated table #262@1: 45034 keys, 2204181 bytes
-2024/12/12-14:43:13.847 4fac Generated table #263@1: 38655 keys, 2195315 bytes
-2024/12/12-14:43:14.076 4fac Generated table #264@1: 81060 keys, 1676485 bytes
-2024/12/12-14:43:14.076 4fac Compacted 1@1 + 3@2 files => 6075981 bytes
-2024/12/12-14:43:14.110 4fac compacted to: files[ 0 0 3 0 0 0 0 ]
-2024/12/12-14:43:14.110 4fac Delete type=2 #256
-2024/12/12-14:43:14.110 4fac Delete type=2 #257
-2024/12/12-14:43:14.111 4fac Delete type=2 #258
-2024/12/12-14:43:14.111 4fac Delete type=2 #261
+2024/12/13-15:41:09.777 5a5c Reusing MANIFEST E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2024/12/13-15:41:09.778 5a5c Recovering log #902
+2024/12/13-15:41:09.790 5a5c Reusing old log E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000902.log 
+2024/12/13-15:41:11.309 58e0 Level-0 table #910: started
+2024/12/13-15:41:11.385 58e0 Level-0 table #910: 110643 bytes OK
+2024/12/13-15:41:11.437 58e0 Delete type=0 #902
+2024/12/13-15:41:11.437 58e0 Manual compaction at level-0 from '\x00\xce\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\xcf\x00\x00\x00' @ 0 : 0; will stop at (end)
+2024/12/13-15:41:11.844 5a5c Compacting 1@1 + 4@2 files
+2024/12/13-15:41:12.142 5a5c Generated table #911@1: 86601 keys, 2236245 bytes
+2024/12/13-15:41:12.416 5a5c Generated table #912@1: 36118 keys, 2212520 bytes
+2024/12/13-15:41:12.586 5a5c Generated table #913@1: 33953 keys, 2193084 bytes
+2024/12/13-15:41:12.823 5a5c Generated table #914@1: 104620 keys, 2163202 bytes
+2024/12/13-15:41:12.823 5a5c Compacted 1@1 + 4@2 files => 8805051 bytes
+2024/12/13-15:41:12.872 5a5c compacted to: files[ 0 0 4 0 0 0 0 ]
+2024/12/13-15:41:12.873 5a5c Delete type=2 #904
+2024/12/13-15:41:12.873 5a5c Delete type=2 #905
+2024/12/13-15:41:12.873 5a5c Delete type=2 #906
+2024/12/13-15:41:12.873 5a5c Delete type=2 #907
+2024/12/13-15:41:12.873 5a5c Delete type=2 #910

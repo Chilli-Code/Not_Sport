@@ -70,11 +70,11 @@ const Home = () => {
     const username = localStorage.getItem("username") || "Usuario desconocido";
     const cancha = selectedCancha?.nombre || "Cancha";
     const message = `
-    🌟 Soy *${username}*, estoy interesado en un partido de la Cancha *${cancha}*.
-    📅 *Fecha del partido*: ${formData.fecha}
-    ⏰ *Hora del partido*: ${formData.hora}
-    ⚽ *Equipos:* ${formData.equipos}
-    📝 *Descripción*: ${formData.descripcion || "No especificada"}
+🌟 Soy *${username}*, estoy interesado en un partido de la Cancha *${cancha}*.
+📅 *Fecha del partido*: ${formData.fecha}
+⏰ *Hora del partido*: ${formData.hora}
+⚽ *Equipos:* ${formData.equipos}
+📝 *Descripción*: ${formData.descripcion || "No especificada"}
     `.trim();
     const encodedMessage = encodeURIComponent(message);
     const phoneNumber = "+573005030249";
