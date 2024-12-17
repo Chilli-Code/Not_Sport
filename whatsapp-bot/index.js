@@ -68,8 +68,9 @@ const checkForUpdates = async () => {
         if (telefono) {
           await whatsappClient.sendMessage(
             `${telefono}@c.us`,
-            `🎉 ¡Tu partido en la cancha *${cancha}* está listo 
-escriba *ok* para proceder con el pago. ⚽`
+            `🎉¡Ajá, brother! Tu partido en la cancha *${cancha}* ya está listo pa' la acción. ⚽
+
+🤖 Soy *Clippy* y te aviso que llegó la hora de darle play. ✍ Escribe *"Pago"* pa' seguir la vuelta y cuadrar el pago. 💵⚽`
           );
           console.log(`Mensaje enviado a ${telefono}`);
 
@@ -93,6 +94,11 @@ escriba *ok* para proceder con el pago. ⚽`
 
 setInterval(checkForUpdates, 60000);
 
+function formatDateToISO(dateString) {
+  const [day, month, year] = dateString.split('/');
+  return `${year}-${month}-${day}`;
+}
+
 // Manejar mensajes entrantes
 whatsappClient.on('message', async (message) => {
   console.log('Mensaje recibido (en bruto):', message.body);
@@ -101,11 +107,58 @@ whatsappClient.on('message', async (message) => {
   const userMessage = message.body.trim().toLowerCase();
   
 
+
+
+  // Priorizar "pago" antes de cualquier otra lógica
+  if (userMessage === 'pago') {
+    for (const [pageId, reminder] of Object.entries(activeReminders)) {
+      const response = await notion.pages.retrieve({ page_id: pageId });
+      const userPhone = response.properties['Número de Teléfono']?.phone_number;
+
+      if (userPhone === telefono) {
+        console.log(`Respuesta "Pago" recibida del usuario ${telefono} para el pedido ${pageId}.`);
+
+        clearInterval(reminder);
+        delete activeReminders[pageId];
+
+        const paymentLink = 'https://checkout.bold.co/payment/LNK_PJUJJLEW6Q';
+        await whatsappClient.sendMessage(
+          message.from,
+          `🔗 ¡Gracias! Aquí está el enlace para realizar el pago:\n${paymentLink}` +
+          `Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
+💸 Tenga dinero disponible.
+✅ No esté bloqueado ni restringido.
+🛍 Esté habilitado para compras internacionales si tu tarjeta no es Colombiana.
+👌 Tenga topes que le permitan pagar el valor de tu compra`
+        );
+
+        awaitingEmail[telefono] = true;
+        await whatsappClient.sendMessage(
+          message.from,
+          `📧 *Clippy🤖* Que Hay Brother!! ya casi terminamos en enviame tu *Correo de Gmail para compartirte el partido 🏟*`
+        );
+
+        await notion.pages.update({
+          page_id: pageId,
+          properties: {
+            'Estado Pedido': { select: { name: 'Procesando Pago' } },
+          },
+        });
+
+        console.log(`Estado del pedido ${pageId} actualizado a "Procesando Pago".`);
+        return;
+      }
+    }
+    return;
+  }
+
+
   // Inicializar la sesión del usuario si no existe
   if (!userSessions[telefono]) {
     userSessions[telefono] = {
       awaitingDetails: false,
       awaitingConfirmation: false,
+      hasGreeted: false,
       editField: '',
       partidoData: {
         fecha: '',
@@ -116,212 +169,270 @@ whatsappClient.on('message', async (message) => {
       }
     };
   }
+  if (!userSessions[telefono]) {
+    userSessions[telefono] = {
+      awaitingUsername: false,
+      pageId: null, // Guardar el page_id de Notion
+      partidoData: {},
+    };
+  }
 
   const session = userSessions[telefono];
 
-  if (usersAwaitingResponse[telefono]) {
-  // Mostrar el menú principal
-  if (userMessage === 'menu') {
-    await whatsappClient.sendMessage(
-      message.from,
-      `*Menú principal*\n\n` +
-      `1️⃣ *Compra De Partido 📽️*\n` +
-      `2️⃣ *Compra de Resumen y Clip 🎬*\n` +
-      `3️⃣ *Combo Completo 📦*\n` +
-      `4️⃣ *Precios 💸*\n\n` +
-      `Por favor ingresa el número de la opción que deseas seleccionar.`
-    );
-    return;
-  }
-
-  // Opción 1: Compra de Partido
-  if (userMessage === '1') {
-    session.awaitingDetails = true;
-    await whatsappClient.sendMessage(
-      message.from,
-      `Has seleccionado *Compra De Partido*. Por favor completa la siguiente información en el siguiente formato:\n\n` +
-      `*Fecha del partido*: (Ej: Dia/Mes/Año)\n` +
-      `*Hora del partido*: (Ej: 15:10 PM)\n` +
-      `*Equipos del partido*: (Ej: Equipo1 vs Equipo2)\n` +
-      `*Cancha*: (Ej: Nombre de la cancha)\n` +
-      `*Descripción (Opcional)*: _Describe tu indumentaria_\n\n` +
-      `Cuando termines, escribe *Ok* para continuar.`
-    );
-    return;
-  }
-
-  // Capturar detalles en un solo mensaje
-  if (session.awaitingDetails && userMessage !== 'ok') {
-    const lines = message.body.split('\n');
-    session.partidoData = {
-        fecha: lines[0]?.trim() || '',
-        hora: lines[1]?.trim() || '',
-        equipos: lines[2]?.trim() || '',
-        cancha: lines[3]?.trim() || '',
-        descripcion: lines[4]?.trim() || 'Sin descripción',
-    };
-
-    // Validar si los datos están completos
-    const { fecha, hora, equipos, cancha } = session.partidoData;
-    if (!fecha || !hora || !equipos || !cancha) {
-        await whatsappClient.sendMessage(
-            message.from,
-            `⚠️ *Datos incompletos.* Por favor asegúrate de proporcionar:\n` +
-            `- *Fecha del partido*\n` +
-            `- *Hora del partido*\n` +
-            `- *Equipos del partido*\n` +
-            `- *Cancha*\n\n` +
-            `Envía los datos nuevamente en el formato indicado.`
-        );
-        return;
-    }
-
-    // Si los datos están completos, permitir continuar
-    await whatsappClient.sendMessage(
-        message.from,
-        `✅ Datos recibidos correctamente. Escribe *Ok* para confirmar o vuelve a enviar los datos si necesitas corregirlos.`
-    );
-    return;
-}
 
 
-  // Validar datos al recibir "Ok"
-  if (session.awaitingDetails && userMessage === 'ok') {
-    const { fecha, hora, equipos, cancha } = session.partidoData;
-
-    if (!fecha || !hora || !equipos || !cancha) {
-      await whatsappClient.sendMessage(
-        message.from,
-        `⚠️ Datos incompletos. Por favor asegúrate de proporcionar:\n` +
-        `- *Fecha del partido*\n` +
-        `- *Hora del partido*\n` +
-        `- *Equipos del partido*\n` +
-        `- *Cancha*\n\n` +
-        `Vuelve a enviar los datos correctamente.`
-      );
-      return;
-    }
-
-    // Confirmación de datos completos
-    await whatsappClient.sendMessage(
-      message.from,
-      `🎉 ¡Datos completos! Aquí tienes la información proporcionada:\n\n` +
-      `*Fecha*: ${fecha}\n` +
-      `*Hora*: ${hora}\n` +
-      `*Equipos*: ${equipos}\n` +
-      `*Cancha*: ${cancha}\n` +
-      `*Descripción*: ${session.partidoData.descripcion}\n\n` +
-      `¿Los datos son correctos?\n9️⃣ *Confirmar*.`
-    );
-
-    session.awaitingDetails = false;
-    session.awaitingConfirmation = true;
-    return;
-  }else{
-    // Confirmación o edición
-// Función para convertir una fecha al formato ISO 8601
-function formatDateToISO(dateString) {
-  const [day, month, year] = dateString.split('/');
-  return `${year}-${month}-${day}`;
-}
-
-// Dentro de la confirmación de datos:
-if (session.awaitingConfirmation) {
-  if (userMessage === '9') { // Manejar confirmación
-    try {
-      // Convertir la fecha al formato ISO 8601
-      const formattedDate = formatDateToISO(session.partidoData.fecha);
-
-      // Guardar los datos en Notion
-      await notion.pages.create({
-        parent: { database_id: databaseId },
-        properties: {
-          Usuario: { title: [{ text: { content: 'Userchat' } }] }, // Usuario fijo
-          'Fecha Pedido': { date: { start: new Date().toISOString() } }, // Fecha y hora actuales
-          'Fecha del partido': { date: { start: formattedDate } }, // Fecha formateada
-          'Hora Del Partido': { rich_text: [{ text: { content: session.partidoData.hora } }] },
-          'Estado Pedido': { select: { name: 'Pendiente' } }, // Estado definido
-          'Cancha': { select: { name: session.partidoData.cancha } },
-          'Equipos': { rich_text: [{ text: { content: session.partidoData.equipos } }] },
-          'Descripcion': { rich_text: [{ text: { content: session.partidoData.descripcion } }] },
-          'Número de Teléfono': { phone_number: telefono }, // Teléfono del usuario
+  // Verificar si el usuario está registrado
+  try {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        property: 'Número de Teléfono',
+        phone_number: {
+          equals: telefono,
         },
-      });
+      },
+    });
 
-      // Confirmación de guardado al usuario
-      await whatsappClient.sendMessage(
-        message.from,
-        '✅ ¡Datos guardados en Notion correctamente! Gracias por usar nuestro servicio.'
-      );
+    const usuarioRegistrado = response.results.length > 0;
+ // Buscar usuario en Notion
+ try {
+  const response = await notion.databases.query({
+    database_id: databaseId,
+    filter: { property: 'Número de Teléfono', phone_number: { equals: telefono } },
+  });
 
-      // Finalizar la sesión del usuario
-      delete userSessions[telefono];
-    } catch (error) {
-      console.error('Error al guardar en Notion:', error);
-
-      // Notificar error al usuario
-      await whatsappClient.sendMessage(
-        message.from,
-        '⚠️ Ocurrió un error al guardar el partido. Inténtalo nuevamente más tarde.'
-      );
-    }
-    return;
+  if (response.results.length > 0) {
+    session.pageId = response.results[0].id; // Guardar el page_id si existe
+    session.username = response.results[0].properties['Usuario']?.title?.[0]?.text?.content || 'Usuario';
   }
+} catch (error) {
+  console.error('Error al verificar usuario en Notion:', error);
 }
 
+// Si el usuario no está registrado y escribe "si"
+if (!session.pageId && userMessage === 'si' && !session.awaitingUsername) {
+  session.awaitingUsername = true;
+  await whatsappClient.sendMessage(message.from, 'Por favor, escribe tu nombre de usuario para continuar.');
+  return;
+}
 
+// Capturar nombre de usuario y crear el registro en Notion
+if (session.awaitingUsername && userMessage) {
+  session.username = userMessage;
+
+  // Crear una fila en Notion solo con el nombre y teléfono
+  try {
+    const newUser = await notion.pages.create({
+      parent: { database_id: databaseId },
+      properties: {
+        Usuario: { title: [{ text: { content: userMessage } }] },
+        'Número de Teléfono': { phone_number: telefono },
+      },
+    });
+    session.pageId = newUser.id; // Guardar el page_id
+    session.awaitingUsername = false;
+
+    await whatsappClient.sendMessage(message.from, `¡Gracias, *${userMessage}*! Ahora puedes realizar tu pedido.`);
+  } catch (error) {
+    console.error('Error al crear usuario en Notion:', error);
+    await whatsappClient.sendMessage(message.from, 'Ocurrió un error al registrar tu nombre. Inténtalo de nuevo.');
   }
+  return;
+}
 
-  // Confirmación o edición
-  if (session.awaitingConfirmation) {
-    if (userMessage === '2') {
+    if (session.awaitingUsername && userMessage) {
+      session.username = userMessage;
+      session.awaitingUsername = false;
+      
+      // Guardar el usuario en Notion
       try {
         await notion.pages.create({
           parent: { database_id: databaseId },
           properties: {
-            Usuario: { title: [{ text: { content: telefono } }] },
-            'Fecha del partido': { date: { start: session.partidoData.fecha } },
-            'Hora Del Partido': { rich_text: [{ text: { content: session.partidoData.hora } }] },
-            Equipos: { rich_text: [{ text: { content: session.partidoData.equipos } }] },
-            Cancha: { select: { name: session.partidoData.cancha } },
-            Descripcion: { rich_text: [{ text: { content: session.partidoData.descripcion } }] },
+            'Usuario': { title: [{ text: { content: userMessage } }] },
+            'Número de Teléfono': { phone_number: telefono },
           },
         });
-
-        await whatsappClient.sendMessage(
-          message.from,
-          '✅ ¡Partido registrado correctamente! Gracias por usar nuestro servicio.'
-        );
-        delete userSessions[telefono]; // Finaliza la sesión
       } catch (error) {
-        console.error('Error al guardar en Notion:', error);
-        await whatsappClient.sendMessage(
-          message.from,
-          '⚠️ Hubo un error al guardar el partido. Inténtalo de nuevo.'
-        );
+        console.error('Error al guardar usuario en Notion:', error);
       }
+
+      await whatsappClient.sendMessage(
+        message.from,
+        `Usuario: *${userMessage}*`
+      );
+      return;
     }
-    return;
+
+    if (usuarioRegistrado && !session.hasGreeted) {
+      const usuarioNombre = response.results[0].properties['Usuario']?.title?.[0]?.text?.content || 'Usuario';
+      await whatsappClient.sendMessage(
+        message.from,
+        `Bienvenido usuario: *${usuarioNombre}*`
+      );
+      console.log(`Mensaje de bienvenida enviado a ${telefono} con el nombre de usuario: ${usuarioNombre}`);
+      session.hasGreeted = true; // Marcar como saludado
+    }
+    
+    
+  } catch (error) {
+    console.error('Error al verificar usuario en Notion:', error);
   }
 
-    // Lógica para manejar respuesta de "¿Desea continuar?"
-    if (userMessage === 'sí' || userMessage === 'si') {
-        await whatsappClient.sendMessage(
-            message.from,
-            `*Menú principal:*\n
-1️⃣ *Compra De Partido. 📽️*\n
-2️⃣ *Compra de Resumen y Clip. 🎬*\n
-3️⃣ *Combo Completo. 📦*\n 
-4️⃣ *Precio.s 💸* \n\n
-  Por favor ingresa el número de la opción que deseas seleccionar.`
-        );
-        usersAwaitingResponse[telefono] = 'menu'; // Cambiar el estado a "menu"
-    } else {
-        await whatsappClient.sendMessage(message.from, 'Gracias por tu tiempo. ¡Hasta luego!');
-        delete usersAwaitingResponse[telefono]; // Eliminar al usuario de la lista de espera si no desea continuar
-    }
-    return;
+
+// Manejar el comando 'menu' en cualquier momento
+if (userMessage === 'menu') {
+  usersAwaitingResponse[telefono] = 'menu';
+  await whatsappClient.sendMessage(
+    message.from,
+    `💬 ¡Hola! Soy *Clippy*🤖, tu asistente. ¡Listo para llevarte la emoción de cada partido! ⚽🔥\n\n` +
+    `1️⃣ *Compra De Partido 📽️*\n` +
+    `2️⃣ *Compra de Resumen y Clip 🎬*\n` +
+    `3️⃣ *Combo Completo 📦*\n` +
+    `4️⃣ *Precios 💸*\n\n` +
+    `Por favor ingresa el número de la opción que deseas seleccionar.`
+  );
+  console.log(`Menú enviado a ${telefono}`);
+  return;
 }
+
+// Lógica para manejar selección de opciones en el menú principal
+if (usersAwaitingResponse[telefono] === 'menu') {
+  switch (userMessage.trim()) {
+    case '1':
+      await whatsappClient.sendMessage(
+        message.from,
+        `¡Hey! Soy *Clippy*🤖.¡Vamos a dejar todo listo para tu partido! ⚽  
+¡Veo que has elegido la Compra de Partido! 🏟 Ahora necesito que me des algunos detalles para tener todo bajo control🥅:\n\n` +
+
+        `📅 *Fecha del partido* (Ej: 10/04/2024)\n` +
+        `🕒 *Hora del partido* (Ej: 15:10 || _Hora Militar_)\n` +
+        `⚽ *Equipos del partido* (Ej: Equipo1 vs Equipo2)\n` +
+        `🏟  *Cancha* (Ej: Nombre de la cancha)\n` +
+        `📝 *Descripción* (Opcional): Describe tu indumentaria\n\n`+
+`📢 *Envíame los datos, cada uno en una línea, siguiendo este formato.*`
+      );
+      userSessions[telefono].awaitingDetails = true;
+      usersAwaitingResponse[telefono] = null; // Limpiar el estado
+      break;
+
+
+
+    case '2':
+    case '3':
+      await whatsappClient.sendMessage(
+        message.from,
+        `Has seleccionado la opción ${userMessage}. Por favor, espera mientras procesamos tu solicitud.`
+      );
+      usersAwaitingResponse[telefono] = null; // Limpiar el estado
+      break;
+    case '4': // Manejar la opción de precios
+      await whatsappClient.sendMessage(
+        message.from,
+        `¡Ajá, brother! Aquí te habla *Clippy*🤖, el pana que siempre está listo pa' darte la mano en la cancha 🤖⚽.Te cuento que estos son nuestros precios, pa' que te animes:\n\n` +
+        `✅ *Descargar Partido*🏟️: _20.000💵_ \n` +
+        `✅ *Resumen Del Partido*: _12.000💵_ \n` +
+        `✅ *Clips Personalizados*: \n\n` +
+        `⚫ _Clip Corto:_ *5.000💵* Para aquellos momentos breves y destacados, ideal para jugadas individuales o goles.\n\n` +
+        `⚫ _Clip Largo:_ *10.000💵* Para secuencias más detalladas o análisis completos.\n\n`+
+        `Entonces qué, mano? ¡Dime cuál te interesa y lo sacamos de una con Clippy!🌴🔥`
+    );
+      usersAwaitingResponse[telefono] = null; // Limpiar el estado
+      break;
+    default:
+      await whatsappClient.sendMessage(
+        message.from,
+        `⚠️ Opción no válida. Por favor, selecciona un número del menú.`
+      );
+      break;
+  }
+  return;
+
+
+  
+}
+
+// Capturar los datos del usuario después de que seleccionó "1"
+if (session.awaitingDetails && userMessage !== 'ok') {
+  const lines = message.body.split('\n').map((line) => line.trim());
+
+  if (lines.length >= 4) { // Verificar que se hayan enviado los 4 campos requeridos
+    session.partidoData.fecha = lines[0];
+    session.partidoData.hora = lines[1];
+    session.partidoData.equipos = lines[2];
+    session.partidoData.cancha = lines[3];
+
+    await whatsappClient.sendMessage(
+      message.from,
+      `🎉 ¡Oe, mano! Aquí te dejo la info que me pasaste, todo bien bacano: 🤖⚽* \n\n` +
+      `📅 *Fecha:* ${session.partidoData.fecha}\n` +
+      `⏰ *Hora:* ${session.partidoData.hora}\n` +
+      `⚽ *Equipos:* ${session.partidoData.equipos}\n` +
+      `🏟️ *Cancha:* ${session.partidoData.cancha}\n\n` +
+    `¿Ta' to' bien o hay que corregir algo? 😏\n\n`+
+      `✅ Escribe *Ok*  pa' dejarlo listo o escribe *Cancelar* si algo no cuadra.🔥
+¿`
+    );
+  } else {
+    await whatsappClient.sendMessage(
+      message.from,
+      `⚠ ¡Ey, bro! Soy *Clippy*🤖 y me hace falta algo de info para seguir con esto.
+Mándame estos datos para que quede todo ready:👇 \n\n` +
+      `📅 Fecha del partido\n` +
+      `🕒 Hora del partido\n` +
+      `⚽ Equipos del partido\n` +
+      `🏟 Cancha\n\n` +
+      `Mándame los datos así, cada uno en una línea. ¡Dale, bro, que esto se pone bueno!⚽🔥
+`
+    );
+  }
+  return;
+}
+
+// Confirmar los datos y guardar en Notion al recibir "ok"
+// Confirmar los datos y guardar en Notion al recibir "ok"
+if (session.awaitingDetails && userMessage === 'ok') {
+  session.awaitingDetails = false; // Limpiar el estado
+
+  try {
+    await notion.pages.create({
+      parent: { database_id: databaseId },
+      properties: {
+        'Usuario': { title: [{ text: { content: session.username || 'Usuario desconocido' } }] },
+        'Fecha del partido': { date: { start: formatDateToISO(session.partidoData.fecha) } },
+        'Hora Del Partido': { rich_text: [{ text: { content: session.partidoData.hora } }] },
+        Equipos: { rich_text: [{ text: { content: session.partidoData.equipos } }] },
+        Cancha: { select: { name: session.partidoData.cancha } },
+        'Fecha Pedido': { date: { start: new Date().toISOString() } },
+        'Estado Pedido': { select: { name: 'Pendiente' } },
+        'Número de Teléfono': { phone_number: telefono }
+      }
+    });
+
+    console.log('Nuevo pedido guardado en Notion.');
+    await whatsappClient.sendMessage(
+      message.from,
+      `✅ *¡Listo, Mano!* Yo mismo me encargué de guardar to' bien bacano. 🤖⚽
+    Tu partido ya está en *estado: Pendiente* ⏳. Tranquilo, que durante el día te aviso cuando esté ready pa' que lo disfrutes. 🕒⚽\n\n`+
+    
+    `🔥 Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
+    
+    ¡Gracias por confiar en mí, *Clippy!*🤖.Aquí siempre estoy firme pa' lo que necesites. 🔥
+    
+    `
+    );
+
+  } catch (error) {
+    console.error('Error al guardar en Notion:', error);
+    session.awaitingDetails = true; // Volver a solicitar en caso de error
+    await whatsappClient.sendMessage(
+      message.from,
+      `❌ Ocurrió un error al registrar tu pedido. Por favor, intenta nuevamente.`
+    );
+  }
+}
+
+
 
 
 
@@ -340,11 +451,14 @@ if (usersAwaitingResponse[telefono] === 'menu') {
       case '4': // Manejar la opción de precios
           await whatsappClient.sendMessage(
               message.from,
+              `¡Ajá, brother! Aquí te habla *Clippy*🤖, el pana que siempre está listo pa' darte la mano en la cancha 🤖⚽.
+              Te cuento que estos son nuestros precios, pa' que te animes:\n\n` +
               `✅ *Descargar Partido*🏟️: _20.000💵_ \n` +
-              `✅ *Resumen Del Partido*: _12.000💵_ \n\n` +
+              `✅ *Resumen Del Partido*: _12.000💵_ \n` +
               `✅ *Clips Personalizados*: \n\n` +
               `⚫ _Clip Corto:_ *5.000💵* Para aquellos momentos breves y destacados, ideal para jugadas individuales o goles.\n\n` +
-              `⚫ _Clip Largo:_ *10.000💵* Para secuencias más detalladas o análisis completos.`
+              `⚫ _Clip Largo:_ *10.000💵* Para secuencias más detalladas o análisis completos.\n\n`+
+              `Entonces qué, mano? ¡Dime cuál te interesa y lo sacamos de una con Clippy!🌴🔥`
           );
           console.log('Menú de precios enviado.');
           break;
@@ -380,19 +494,56 @@ if (usersAwaitingResponse[telefono] === 'menu') {
           const usuarioNombre = response.results[0].properties['Usuario']?.title?.[0]?.text?.content || 'Usuario';
           await whatsappClient.sendMessage(
               message.from,
-              `Bienvenido usuario: *${usuarioNombre}*`
+              // `Bienvenido usuario: *${usuarioNombre}*`
+              `¡Hola, *${usuarioNombre}* Soy *Clippy*, tu asistente 🤖.¡Qué bacano tenerte por aquí! ⚽🌴
+  
+Te recuerdo que puedes escribirme *"Menu"* si necesitas pedir algo nuevo.
+¡Estoy aquí pa’ ayudarte en lo que necesites! `
           );
           console.log(`Mensaje de bienvenida enviado a ${telefono} con el nombre de usuario: ${usuarioNombre}`);
       } else {
           // Validar si el mensaje viene de la web
-          if (!userMessage.startsWith("web:")) { // Cambia esta lógica según cómo identifiques los mensajes de la web
+          if (usersAwaitingResponse[telefono]) {
+            if (userMessage === 'si') {
+              delete usersAwaitingResponse[telefono]; // Limpiar el estado después de responder
+              session.awaitingUsername = true; // Proceder a pedir el nombre de usuario
               await whatsappClient.sendMessage(
-                  message.from,
-                  'Buenas tardes, queremos informarles que no somos Baloa. ¿Desea continuar? Responda con "Sí" o "No".'
+                message.from,
+                'Por favor, escribe tu nombre de usuario para continuar.'
               );
-              usersAwaitingResponse[telefono] = true; // Agregar usuario a la lista de espera
-              console.log(`Mensaje de "no somos Baloa" enviado a ${telefono}.`);
-          } else {
+              return;
+            } else if (userMessage === 'no') {
+              delete usersAwaitingResponse[telefono]; // Limpiar el estado
+              await whatsappClient.sendMessage(
+                message.from,
+                'Gracias por tu respuesta. Si necesitas algo más, no dudes en escribirme.'
+              );
+              return;
+            }
+          } else if (!userMessage.startsWith("web:")) { // Si no hay estado de espera y no viene de la web
+            usersAwaitingResponse[telefono] = true; // Marcar al usuario en espera de respuesta
+            await whatsappClient.sendMessage(
+              message.from,
+              `📢 Buenas tardes,
+
+📝 Quisiera comentarte un tema importante: las políticas de Baloa han cambiado 🚫 y ya no es posible descargar los resúmenes ni los clips personalizados directamente desde su plataforma.
+
+✨ ¡Pero no te preocupes! Tenemos una solución para ti. ✨
+
+💡 Es importante aclarar que NO formamos parte de Baloa, pero ofrecemos servicios adicionales que ellos no pueden cubrir. Entre ellos se encuentra:
+📺 El partido completo, si lo deseas
+🎞 Resúmenes personalizados
+⚽ Clips destacados
+
+Todo esto a un precio accesible 💰 para que no tengas ningún inconveniente.
+
+❓¿Te gustaría hacer uso de alguno de nuestros servicios?
+Responda con "Sí" o "No" 🤝
+              `
+            );
+            console.log(`Mensaje de "no somos Baloa" enviado a ${telefono}.`);
+          }
+           else {
               console.log('Mensaje recibido desde la web, ignorando lógica de "no somos Baloa".');
           }
       }
@@ -411,89 +562,8 @@ if (usersAwaitingResponse[telefono] === 'menu') {
     return;
   }
 
-  if (userMessage === 'ok') {
-    for (const [pageId, reminder] of Object.entries(activeReminders)) {
-      const response = await notion.pages.retrieve({ page_id: pageId });
-      const userPhone = response.properties['Número de Teléfono']?.phone_number;
+ 
 
-      if (userPhone === telefono) {
-        console.log(`Respuesta "Ok" recibida del usuario ${telefono} para el pedido ${pageId}.`);
-
-        clearInterval(reminder);
-        delete activeReminders[pageId];
-
-        const paymentLink = 'https://checkout.bold.co/payment/LNK_PJUJJLEW6Q';
-        await whatsappClient.sendMessage(
-          message.from,
-          `🔗 ¡Gracias! Aquí está el enlace para realizar el pago:
-${paymentLink}`
-        );
-
-        awaitingEmail[telefono] = true;
-        await whatsappClient.sendMessage(
-          message.from,
-          `📧 ¿Nos puedes compartir tu correo electrónico para enviarte el enlace de tu partido?`
-        );
-
-        await notion.pages.update({
-          page_id: pageId,
-          properties: {
-            'Estado Pedido': {
-              select: { name: 'Procesando Pago' },
-            },
-          },
-        });
-
-        console.log(`Estado del pedido ${pageId} actualizado a "Procesando Pago".`);
-        return;
-      }
-    }
-  }
-
-  if (userMessage === 'nuevo pedido') {
-    try {
-      // Consultar si el usuario está registrado en Notion
-      const response = await notion.databases.query({
-        database_id: databaseId,
-        filter: {
-          property: 'Número de Teléfono',
-          phone_number: {
-            equals: telefono,
-          },
-        },
-      });
-  
-      const usuarioRegistrado = response.results.length > 0;
-  
-      if (usuarioRegistrado) {
-        // Enviar el menú principal si el usuario está registrado
-        await whatsappClient.sendMessage(
-          message.from,
-          `*Menú principal*\n
-1️⃣ *Compra De Partido. 📽️*\n
-2️⃣ *Compra de Resumen y Clip. 🎬*\n
-3️⃣ *Combo Completo. 📦*\n 
-4️⃣ *Precios. 💸* \n\n
-  Por favor ingresa el número de la opción que deseas seleccionar.`
-        );
-        console.log(`Menú principal enviado a ${telefono}.`);
-      } else {
-        // Respuesta para usuarios no registrados
-        await whatsappClient.sendMessage(
-          message.from,
-          `⚠️ Lo sentimos, no encontramos tu registro. Por favor, regístrate primero para realizar un pedido.`
-        );
-        console.log(`Usuario no registrado: ${telefono}`);
-      }
-    } catch (error) {
-      console.error('Error al verificar usuario en Notion:', error);
-      await whatsappClient.sendMessage(
-        message.from,
-        `⚠️ Ocurrió un error al procesar tu solicitud. Inténtalo nuevamente más tarde.`
-      );
-    }
-    return;
-  }
   
 
 
@@ -526,20 +596,43 @@ ${paymentLink}`
 
   try {
     console.log('Intentando guardar el pedido en Notion...');
-    await notion.pages.create({
-      parent: { database_id: databaseId },
-      properties: {
-        Usuario: { title: [{ text: { content: usuario } }] },
-        'Fecha Pedido': { date: { start: new Date().toISOString() } },
-        'Fecha del partido': { date: { start: fechaPartido } },
-        'Hora Del Partido': { rich_text: [{ text: { content: horaPartido } }] },
-        'Estado Pedido': { select: { name: 'Pendiente' } },
-        Cancha: { select: { name: cancha } },
-        Equipos: { rich_text: [{ text: { content: equipos } }] },
-        Descripcion: { rich_text: [{ text: { content: descripcion } }] },
-        'Número de Teléfono': { phone_number: telefono },
-      },
-    });
+// Crear una nueva fila en Notion siempre
+// Crear una nueva fila en Notion siempre
+await notion.pages.create({
+  parent: { database_id: databaseId },
+  properties: {
+    'Usuario': { title: [{ text: { content: session.username || 'Usuario desconocido' } }] },
+    'Fecha del partido': { date: { start: formatDateToISO(session.partidoData.fecha) } },
+    'Hora Del Partido': { rich_text: [{ text: { content: session.partidoData.hora } }] },
+    Equipos: { rich_text: [{ text: { content: session.partidoData.equipos } }] },
+    Cancha: { select: { name: session.partidoData.cancha } },
+    'Fecha Pedido': { date: { start: new Date().toISOString() } },
+    'Estado Pedido': { select: { name: 'Pendiente' } },
+    'Número de Teléfono': { phone_number: telefono }
+  }
+});
+
+console.log('Nuevo pedido guardado en Notion.');
+await whatsappClient.sendMessage(
+  message.from,
+  `✅ *¡Listo, Mano!* Yo mismo me encargué de guardar to' bien bacano. 🤖⚽
+Tu partido ya está en *estado: Pendiente* ⏳. Tranquilo, que durante el día te aviso cuando esté ready pa' que lo disfrutes. 🕒⚽\n\n`+
+
+`🔥 Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
+
+¡Gracias por confiar en mí, *Clippy!*🤖.Aquí siempre estoy firme pa' lo que necesites. 🔥
+
+`
+
+
+);
+
+
+console.log('Nuevo pedido guardado en Notion.');
+await whatsappClient.sendMessage(
+  message.from,
+  `✅ *¡Todo listo!* Tu nuevo pedido ha sido registrado con éxito. ⚽`
+);
 
     console.log('Pedido guardado en Notion correctamente.');
     await whatsappClient.sendMessage(
