@@ -28,6 +28,11 @@ whatsappClient.on('qr', (qr) => {
   console.log('Escanea este código QR para iniciar sesión con WhatsApp:');
   qrcode.generate(qr, { small: true });
 });
+whatsappClient.on('disconnected', (reason) => {
+  console.log('Cliente desconectado:', reason);
+  console.log('Por favor, vuelve a ejecutar la aplicación.');
+});
+let botNumber;
 
 // Evento cuando la sesión está lista
 whatsappClient.on('ready', () => {
@@ -45,7 +50,6 @@ let activeReminders = {};
 let awaitingEmail = {};
 let usersAwaitingResponse = {};
 let userSessions = {};
-
 
 // Verificar cambios en los estados de los pedidos
 const checkForUpdates = async () => {
@@ -106,6 +110,19 @@ whatsappClient.on('message', async (message) => {
   const telefono = message.from.replace('@c.us', '');
   const userMessage = message.body.trim().toLowerCase();
   
+  const usernameMatch = message.body.match(/soy \*(.+?)\*/i);
+  const canchaMatch = message.body.match(/cancha\s*:?\s*(.+?)(?:\n|$)/i);
+  const fechaPartidoMatch = message.body.match(/\*fecha del partido\*:\s*(\d{2}-\d{2}-\d{4})/i);
+  const horaPartidoMatch = message.body.match(/\*hora del partido\*:\s*(\d{2}:\d{2})/i);
+  const equiposMatch = message.body.match(/equipos\s*:?\s*(.+?)(?:\n|$)/i);
+  const descripcionMatch = message.body.match(/\*descripción\*:\s*(.+?)(?:\n|$)/i);
+
+  const cancha = canchaMatch?.[1]?.trim().replace(/\*/g, '') || 'Desconocida';
+  const fechaPartidoOriginal = fechaPartidoMatch?.[1]?.trim() || null;
+  const horaPartido = horaPartidoMatch?.[1]?.trim() || 'Desconocida';
+  const equipos = equiposMatch?.[1]?.trim().replace(/\*/g, '') || 'Desconocidos';
+  const descripcion = descripcionMatch?.[1]?.trim() || 'No especificada';
+  const usuario = usernameMatch?.[1]?.trim() || 'Usuario desconocido';
 
 
 
@@ -124,7 +141,7 @@ whatsappClient.on('message', async (message) => {
         const paymentLink = 'https://checkout.bold.co/payment/LNK_PJUJJLEW6Q';
         await whatsappClient.sendMessage(
           message.from,
-          `🔗 ¡Gracias! Aquí está el enlace para realizar el pago:\n${paymentLink}` +
+          `🔗 ¡Gracias! Aquí está el enlace para realizar el pago:\n${paymentLink}\n\n` +
           `Vas a pagar $20.000 COP a NotBaloa. Confirma que el método de pago que elijas:
 💸 Tenga dinero disponible.
 ✅ No esté bloqueado ni restringido.
@@ -390,11 +407,36 @@ Mándame estos datos para que quede todo ready:👇 \n\n` +
 }
 
 // Confirmar los datos y guardar en Notion al recibir "ok"
-// Confirmar los datos y guardar en Notion al recibir "ok"
 if (session.awaitingDetails && userMessage === 'ok') {
   session.awaitingDetails = false; // Limpiar el estado
 
   try {
+    // Buscar si el usuario ya existe en Notion
+    const userResponse = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        property: 'Número de Teléfono',
+        phone_number: { equals: telefono }
+      }
+    });
+
+    if (userResponse.results.length === 0) {
+      // Si el usuario no existe, crear una fila para su información inicial
+      console.log("Usuario no encontrado. Creando una nueva fila de usuario.");
+      const newUser = await notion.pages.create({
+        parent: { database_id: databaseId },
+        properties: {
+          'Usuario': { title: [{ text: { content: session.username || 'Usuario desconocido' } }] },
+          'Número de Teléfono': { phone_number: telefono }
+        }
+      });
+
+      console.log(`Fila del usuario creada con ID: ${newUser.id}`);
+    } else {
+      console.log("El usuario ya existe. Creando una nueva fila de pedido.");
+    }
+
+    // Crear una nueva fila para el pedido (independientemente de si el usuario existe o no)
     await notion.pages.create({
       parent: { database_id: databaseId },
       properties: {
@@ -413,26 +455,22 @@ if (session.awaitingDetails && userMessage === 'ok') {
     await whatsappClient.sendMessage(
       message.from,
       `✅ *¡Listo, Mano!* Yo mismo me encargué de guardar to' bien bacano. 🤖⚽
-    Tu partido ya está en *estado: Pendiente* ⏳. Tranquilo, que durante el día te aviso cuando esté ready pa' que lo disfrutes. 🕒⚽\n\n`+
+Tu partido en la cancha *${cancha}🏟️* ya está en *Estado: Pendiente* ⏳. Tranquilo, que durante el día te aviso cuando esté ready pa' que lo disfrutes. 🕒⚽\n\n`+
     
-    `🔥 Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
+    `🔥Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
     
-    ¡Gracias por confiar en mí, *Clippy!*🤖.Aquí siempre estoy firme pa' lo que necesites. 🔥
-    
-    `
+¡Gracias por confiar en mí, *Clippy!*🤖.Aquí siempre estoy firme pa' lo que necesites. 🔥`
     );
 
   } catch (error) {
-    console.error('Error al guardar en Notion:', error);
-    session.awaitingDetails = true; // Volver a solicitar en caso de error
+    console.error('Error al registrar/actualizar pedido en Notion:', error);
+    session.awaitingDetails = true; // Revertir el estado si ocurre un error
     await whatsappClient.sendMessage(
       message.from,
       `❌ Ocurrió un error al registrar tu pedido. Por favor, intenta nuevamente.`
     );
   }
 }
-
-
 
 
 
@@ -474,7 +512,6 @@ if (usersAwaitingResponse[telefono] === 'menu') {
   return;
 }
 
-  
   if (userMessage && userMessage !== 'ok' && !awaitingEmail[telefono]) {
     try {
       const response = await notion.databases.query({
@@ -552,34 +589,88 @@ Responda con "Sí" o "No" 🤝
   }
 }
 
-  if (awaitingEmail[telefono]) {
+
+// Manejar el correo cuando el bot está esperando un correo
+if (awaitingEmail[telefono]) {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+
+  if (emailRegex.test(userMessage)) {
+    // Correo válido
+    const gmail = userMessage.trim();
     awaitingEmail[telefono] = false;
+
+    try {
+      // Buscar el pedido más reciente del usuario
+      const response = await notion.databases.query({
+        database_id: databaseId,
+        filter: {
+          property: 'Número de Teléfono',
+          phone_number: { equals: telefono }
+        }
+      });
+
+      if (response.results.length > 0) {
+        const pageId = response.results[0].id;
+
+        // Actualizar el campo Gmail en Notion
+        await notion.pages.update({
+          page_id: pageId,
+          properties: {
+            Gmail: { email: gmail }
+          }
+        });
+
+        console.log(`Correo Gmail ${gmail} guardado en Notion.`);
+
+        // Enviar mensaje de confirmación al usuario
+        await whatsappClient.sendMessage(
+          message.from,
+          `✅ Gracias por compartir tu correo electrónico. Te enviaremos el enlace de tu partido pronto. 📧`
+        );
+        console.log(`Correo registrado para el usuario ${telefono}: ${gmail}`);
+      } else {
+        console.error('No se encontró un pedido asociado a este número de teléfono.');
+      }
+
+      // 💡 NUEVA LÓGICA: Envía enlace de Google Drive si existe
+      const driveLinkRegex = /https:\/\/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/;
+      const driveLink = 'https://drive.google.com/file/d/13vCd-fado-ANhzEOJjuu-IGEaLA8L0OR/view?usp=drive_link'; // Simula el enlace
+
+      const match = driveLink.match(driveLinkRegex);
+      if (match) {
+        const fileId = match[1]; // Extraer el ID del archivo
+        const directLink = `https://drive.google.com/uc?id=${fileId}&export=download`;
+
+        console.log(`Enlace detectado. ID del archivo: ${fileId}`);
+        console.log(`Enlace directo de descarga: ${directLink}`);
+
+        // Enviar el enlace directo al usuario
+        await whatsappClient.sendMessage(
+          message.from,
+          `✅ *¡Listo!* 🎥\nTu archivo ahora está listo para descargar:\n` +
+          `🔗 ${directLink}`
+        );
+      }
+
+    } catch (error) {
+      console.error('Error al guardar el correo en Notion:', error);
+      await whatsappClient.sendMessage(
+        message.from,
+        '❌ Ocurrió un error al guardar tu correo. Por favor, intenta de nuevo.'
+      );
+    }
+  } else {
+    // Correo inválido
     await whatsappClient.sendMessage(
       message.from,
-      `✅ Gracias por compartir tu correo electrónico. Te enviaremos el enlace de tu partido pronto. 📧`
+      '⚠️ El correo debe ser un *@gmail.com*. Por favor, envíalo nuevamente en el formato correcto.'
     );
-    console.log(`Correo registrado para el usuario ${telefono}: ${message.body}`);
-    return;
   }
-
- 
+}
 
   
 
-
-  const usernameMatch = message.body.match(/soy \*(.+?)\*/i);
-  const canchaMatch = message.body.match(/cancha\s*:?\s*(.+?)(?:\n|$)/i);
-  const fechaPartidoMatch = message.body.match(/\*fecha del partido\*:\s*(\d{2}-\d{2}-\d{4})/i);
-  const horaPartidoMatch = message.body.match(/\*hora del partido\*:\s*(\d{2}:\d{2})/i);
-  const equiposMatch = message.body.match(/equipos\s*:?\s*(.+?)(?:\n|$)/i);
-  const descripcionMatch = message.body.match(/\*descripción\*:\s*(.+?)(?:\n|$)/i);
-
-  const cancha = canchaMatch?.[1]?.trim().replace(/\*/g, '') || 'Desconocida';
-  const fechaPartidoOriginal = fechaPartidoMatch?.[1]?.trim() || null;
-  const horaPartido = horaPartidoMatch?.[1]?.trim() || 'Desconocida';
-  const equipos = equiposMatch?.[1]?.trim().replace(/\*/g, '') || 'Desconocidos';
-  const descripcion = descripcionMatch?.[1]?.trim() || 'No especificada';
-  const usuario = usernameMatch?.[1]?.trim() || 'Usuario desconocido';
+  
 
   let fechaPartido = null;
   if (fechaPartidoOriginal) {
@@ -618,7 +709,7 @@ await whatsappClient.sendMessage(
   `✅ *¡Listo, Mano!* Yo mismo me encargué de guardar to' bien bacano. 🤖⚽
 Tu partido ya está en *estado: Pendiente* ⏳. Tranquilo, que durante el día te aviso cuando esté ready pa' que lo disfrutes. 🕒⚽\n\n`+
 
-`🔥 Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
+`🔥Oye, bro, pásate por nuestra *Web* pa' que tus pedidos sean más rápidos y sin tanto enredo.¡Yo te lo recomiendo! 🌐
 
 ¡Gracias por confiar en mí, *Clippy!*🤖.Aquí siempre estoy firme pa' lo que necesites. 🔥
 

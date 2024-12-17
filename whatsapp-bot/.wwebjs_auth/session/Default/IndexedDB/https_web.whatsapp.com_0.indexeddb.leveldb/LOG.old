@@ -1,29 +1,27 @@
-2024/12/16-18:03:08.246 e58 Reusing MANIFEST E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2024/12/16-18:03:08.247 e58 Recovering log #2930
-2024/12/16-18:03:08.298 e58 Reusing old log E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/002930.log 
-2024/12/16-18:03:09.872 3cd0 Level-0 table #2943: started
-2024/12/16-18:03:09.971 3cd0 Level-0 table #2943: 457817 bytes OK
-2024/12/16-18:03:10.024 3cd0 Delete type=0 #2930
-2024/12/16-18:03:10.024 3cd0 Manual compaction at level-0 from ' \xa1\x01\x00\x00\x00' @ 72057594037927935 : 1 .. ' \xa2\x01\x00\x00\x00' @ 0 : 0; will stop at (end)
-2024/12/16-18:03:10.433 3cd0 Compacting 1@1 + 9@2 files
-2024/12/16-18:03:10.795 3cd0 Generated table #2944@1: 85047 keys, 2233386 bytes
-2024/12/16-18:03:11.140 3cd0 Generated table #2945@1: 96826 keys, 2248935 bytes
-2024/12/16-18:03:11.514 3cd0 Generated table #2946@1: 101697 keys, 2254134 bytes
-2024/12/16-18:03:11.826 3cd0 Generated table #2947@1: 14571 keys, 2234390 bytes
-2024/12/16-18:03:12.096 3cd0 Generated table #2948@1: 20038 keys, 2188345 bytes
-2024/12/16-18:03:12.385 3cd0 Generated table #2949@1: 22129 keys, 2171536 bytes
-2024/12/16-18:03:12.651 3cd0 Generated table #2950@1: 62057 keys, 2199423 bytes
-2024/12/16-18:03:12.952 3cd0 Generated table #2951@1: 111983 keys, 2264165 bytes
-2024/12/16-18:03:13.184 3cd0 Generated table #2952@1: 94224 keys, 1895408 bytes
-2024/12/16-18:03:13.184 3cd0 Compacted 1@1 + 9@2 files => 19689722 bytes
-2024/12/16-18:03:13.238 3cd0 compacted to: files[ 0 0 9 0 0 0 0 ]
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2932
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2933
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2934
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2935
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2936
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2937
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2938
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2939
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2940
-2024/12/16-18:03:13.238 3cd0 Delete type=2 #2943
+2024/12/16-23:32:18.661 6db0 Reusing MANIFEST C:\Users\RYZEN\Documents\Chilly_Code-proyects\plataforma\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2024/12/16-23:32:18.662 6db0 Recovering log #584
+2024/12/16-23:32:18.697 6db0 Reusing old log C:\Users\RYZEN\Documents\Chilly_Code-proyects\plataforma\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000584.log 
+2024/12/16-23:32:20.195 7768 Level-0 table #596: started
+2024/12/16-23:32:20.205 7768 Level-0 table #596: 235749 bytes OK
+2024/12/16-23:32:20.207 7768 Delete type=0 #584
+2024/12/16-23:32:20.207 7768 Manual compaction at level-0 from '\x00H\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00I\x00\x00\x00' @ 0 : 0; will stop at (end)
+2024/12/16-23:32:21.847 71d4 Compacting 1@1 + 8@2 files
+2024/12/16-23:32:21.925 71d4 Generated table #597@1: 69565 keys, 2254329 bytes
+2024/12/16-23:32:21.955 71d4 Generated table #598@1: 3975 keys, 2150466 bytes
+2024/12/16-23:32:22.016 71d4 Generated table #599@1: 29092 keys, 2203396 bytes
+2024/12/16-23:32:22.051 71d4 Generated table #600@1: 4230 keys, 2126364 bytes
+2024/12/16-23:32:22.162 71d4 Generated table #601@1: 90288 keys, 2236650 bytes
+2024/12/16-23:32:22.276 71d4 Generated table #602@1: 113927 keys, 2266685 bytes
+2024/12/16-23:32:22.406 71d4 Generated table #603@1: 114483 keys, 2266660 bytes
+2024/12/16-23:32:22.476 71d4 Generated table #604@1: 66128 keys, 1319315 bytes
+2024/12/16-23:32:22.476 71d4 Compacted 1@1 + 8@2 files => 16823865 bytes
+2024/12/16-23:32:22.477 71d4 compacted to: files[ 0 0 8 0 0 0 0 ]
+2024/12/16-23:32:22.477 71d4 Delete type=2 #586
+2024/12/16-23:32:22.477 71d4 Delete type=2 #587
+2024/12/16-23:32:22.477 71d4 Delete type=2 #588
+2024/12/16-23:32:22.477 71d4 Delete type=2 #589
+2024/12/16-23:32:22.477 71d4 Delete type=2 #590
+2024/12/16-23:32:22.477 71d4 Delete type=2 #591
+2024/12/16-23:32:22.477 71d4 Delete type=2 #592
+2024/12/16-23:32:22.477 71d4 Delete type=2 #593
+2024/12/16-23:32:22.477 71d4 Delete type=2 #596

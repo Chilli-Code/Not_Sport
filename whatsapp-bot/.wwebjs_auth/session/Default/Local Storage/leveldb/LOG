@@ -1,3 +1,5 @@
-2024/12/16-18:03:34.121 48cc Reusing MANIFEST E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
-2024/12/16-18:03:34.121 48cc Recovering log #55
-2024/12/16-18:03:34.122 48cc Reusing old log E:\Documentos\maya\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/000055.log 
+2024/12/16-23:32:43.165 6e84 Reusing MANIFEST C:\Users\RYZEN\Documents\Chilly_Code-proyects\plataforma\Not_Sport\whatsapp-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2024/12/16-23:32:43.166 6e84 Recovering log #11
+2024/12/16-23:32:43.166 6e84 Level-0 table #13: started
+2024/12/16-23:32:43.171 6e84 Level-0 table #13: 13095 bytes OK
+2024/12/16-23:32:43.176 6e84 Delete type=0 #11
